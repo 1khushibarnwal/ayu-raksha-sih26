@@ -831,3 +831,314 @@
     padding: 40px 20px;
   }
 }
+
+/* =========================
+   REUSABLE COMPONENTS
+========================= */
+
+.ayu-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+
+  color: var(--color-primary-dark);
+
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.ayu-brand-small {
+  font-size: 16px;
+}
+
+.ayu-brand-medium {
+  font-size: 20px;
+}
+
+.ayu-brand-large {
+  font-size: 28px;
+}
+
+.ayu-brand-image {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+}
+
+.navbar-logo-link {
+  display: flex;
+}
+
+/* Buttons */
+
+.ayu-button {
+  border: none;
+  border-radius: 999px;
+
+  padding: 13px 24px;
+
+  font-weight: 600;
+
+  transition:
+    transform 0.2s ease,
+    background 0.2s ease;
+}
+
+.ayu-button:hover {
+  transform: translateY(-2px);
+}
+
+.ayu-button-primary {
+  background: var(--color-primary);
+  color: var(--color-white);
+}
+
+.ayu-button-primary:hover {
+  background: var(--color-primary-dark);
+}
+
+.ayu-button-secondary {
+  background: var(--color-cream);
+  color: var(--color-primary);
+}
+
+/* =========================
+   DASHBOARD LAYOUT
+========================= */
+
+.dashboard-layout {
+  min-height: 100vh;
+
+  display: flex;
+
+  background: var(--color-background);
+}
+
+/* SIDEBAR */
+
+.dashboard-sidebar {
+  width: 250px;
+  flex-shrink: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  padding: 28px 18px;
+
+  border-right: 1px solid var(--color-border);
+
+  background: var(--color-surface);
+}
+
+.sidebar-header {
+  padding: 0 12px 36px;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+
+  padding: 12px 14px;
+
+  border-radius: 12px;
+
+  color: var(--color-text-muted);
+
+  font-size: 14px;
+  font-weight: 500;
+
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+.sidebar-link span {
+  width: 20px;
+
+  display: inline-flex;
+  justify-content: center;
+
+  font-size: 17px;
+}
+
+.sidebar-link:hover {
+  background: var(--color-cream);
+  color: var(--color-primary);
+}
+
+.sidebar-link.active {
+  background: #eaf0e7;
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.sidebar-bottom {
+  margin-top: auto;
+
+  padding-top: 20px;
+
+  border-top: 1px solid var(--color-border);
+}
+
+.logout-link {
+  margin-top: 5px;
+}
+
+/* MAIN */
+
+.dashboard-main {
+  min-width: 0;
+  flex: 1;
+
+  display: flex;
+  flex-direction: column;
+}
+
+/* HEADER */
+
+.dashboard-header {
+  height: 78px;
+  flex-shrink: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 0 34px;
+
+  border-bottom: 1px solid var(--color-border);
+
+  background: rgba(255, 255, 255, 0.75);
+
+  backdrop-filter: blur(8px);
+}
+
+.dashboard-header-label {
+  color: var(--color-text-light);
+
+  font-size: 11px;
+  font-weight: 700;
+
+  letter-spacing: 0.14em;
+}
+
+.dashboard-user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.notification-button {
+  width: 38px;
+  height: 38px;
+
+  display: grid;
+  place-items: center;
+
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+
+  cursor: pointer;
+}
+
+.user-avatar {
+  width: 38px;
+  height: 38px;
+
+  display: grid;
+  place-items: center;
+
+  border-radius: 50%;
+
+  background: var(--color-primary);
+  color: var(--color-white);
+
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.user-name {
+  color: var(--color-text);
+
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* CONTENT */
+
+.dashboard-content-area {
+  flex: 1;
+
+  padding: 42px;
+
+  overflow-y: auto;
+}
+
+/* =========================
+   RESPONSIVE DASHBOARD
+========================= */
+
+@media (max-width: 800px) {
+  .dashboard-sidebar {
+    width: 76px;
+
+    padding: 24px 10px;
+  }
+
+  .sidebar-header {
+    padding: 0 0 30px;
+
+    display: flex;
+    justify-content: center;
+  }
+
+  .sidebar-header .ayu-brand-name,
+  .sidebar-link:not(.active)::after {
+    display: none;
+  }
+
+  .sidebar-link {
+    justify-content: center;
+    padding: 13px 8px;
+  }
+
+  .sidebar-link span {
+    margin: 0;
+  }
+
+  .dashboard-content-area {
+    padding: 28px 20px;
+  }
+
+  .user-name {
+    display: none;
+  }
+
+  .dashboard-header {
+    padding: 0 20px;
+  }
+}
+
+@media (max-width: 500px) {
+  .dashboard-sidebar {
+    width: 64px;
+  }
+
+  .dashboard-header {
+    height: 68px;
+  }
+
+  .dashboard-content-area {
+    padding: 24px 16px;
+  }
+}

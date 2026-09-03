@@ -1,16 +1,22 @@
 import { Link } from 'react-router-dom'
 
+import Logo from '../components/Logo'
+import Input from '../components/Input'
+import Button from '../components/Button'
+
 function Login() {
   return (
     <main className="auth-page">
       <div className="auth-card">
-        <div className="auth-brand">
-          <span className="brand-mark">✦</span>
-          <span>AYU</span>
-        </div>
+
+        <Link to="/">
+          <Logo />
+        </Link>
 
         <div className="auth-heading">
-          <span className="section-label">WELCOME BACK</span>
+          <span className="section-label">
+            WELCOME BACK
+          </span>
 
           <h1>Good to see you.</h1>
 
@@ -20,29 +26,25 @@ function Login() {
         </div>
 
         <form className="auth-form">
-          <div className="form-group">
-            <label htmlFor="email">Email address</label>
 
-            <input
-              id="email"
-              type="email"
-              placeholder="you@example.com"
-            />
-          </div>
+          <Input
+            id="email"
+            label="Email address"
+            type="email"
+            placeholder="you@example.com"
+          />
 
-          <div className="form-group">
-            <label htmlFor="password">Password</label>
+          <Input
+            id="password"
+            label="Password"
+            type="password"
+            placeholder="Enter your password"
+          />
 
-            <input
-              id="password"
-              type="password"
-              placeholder="Enter your password"
-            />
-          </div>
-
-          <button type="submit" className="auth-button">
+          <Button type="submit">
             Sign In
-          </button>
+          </Button>
+
         </form>
 
         <p className="auth-switch">
@@ -52,9 +54,13 @@ function Login() {
           </Link>
         </p>
 
-        <Link to="/" className="back-home">
+        <Link
+          to="/"
+          className="back-home"
+        >
           ← Back to AYU
         </Link>
+
       </div>
     </main>
   )
