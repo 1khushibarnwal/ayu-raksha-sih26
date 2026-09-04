@@ -11,6 +11,8 @@ import Dashboard from './pages/Dashboard'
 
 import DashboardLayout from './components/DashboardLayout'
 
+import Assessment from './pages/Assessment'
+
 function App() {
   return (
     <BrowserRouter>
@@ -52,9 +54,7 @@ function App() {
 
           <Route
             path="assessment"
-            element={
-              <h1>Assessment</h1>
-            }
+            element={<Assessment />}
           />
 
           <Route
