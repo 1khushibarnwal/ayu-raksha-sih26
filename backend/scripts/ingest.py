@@ -234,12 +234,307 @@ def detect_section(line: str):
 
     return None
 
+# ============================================================
+# PATENTS ACT — SPECIALIZED SECTION PARSER
+# ============================================================
+
+SECTION_HEADING_RE = re.compile(
+    r"^\s*(\d+[A-Z]?)\.\s+(.+?)\s*$"
+)
+
+AMENDMENT_NOTE_PREFIXES = (
+    "ins. by",
+    "subs. by",
+    "clause",
+    "sub-clause",
+    "omitted by",
+    "inserted by",
+    "substituted by",
+    "the words",
+    "the proviso",
+    "vide notification",
+)
+
+
+def normalize_for_match(text):
+    """
+    Normalize text so that minor PDF extraction differences
+    in punctuation/spacing do not affect comparisons.
+    """
+    return re.sub(r"[^a-z0-9]+", " ", text.lower()).strip()
+
+
+def find_patents_act_body_start(pages):
+    """
+    Find the first real occurrence of Section 1 in the Act body.
+
+    The TOC also contains:
+        1. Short title, extent and commencement.
+
+    We distinguish the real body because it contains:
+        This Act may be called the Patents Act, 1970.
+    """
+
+    for page in pages:
+        for line_index, line in enumerate(page["text"].splitlines()):
+
+            if "This Act may be called the Patents Act, 1970" in line:
+                return page["page_number"], line_index
+
+    raise ValueError(
+        "Could not locate the beginning of the Patents Act body."
+    )
+
+
+def extract_patents_act_toc(pages, body_page):
+    """
+    Extract the section sequence from the Table of Contents.
+
+    The TOC is extremely useful because it tells us which section
+    numbers are actually valid.
+    """
+
+    toc = {}
+    expected_numbers = []
+
+    for page in pages:
+
+        if page["page_number"] >= body_page:
+            break
+
+        for line in page["text"].splitlines():
+
+            match = SECTION_HEADING_RE.match(line)
+
+            if not match:
+                continue
+
+            number = match.group(1).upper()
+            title = match.group(2).strip()
+
+            # Ignore obviously invalid fragments.
+            if len(title) < 5:
+                continue
+
+            if not re.search(r"[A-Za-z]", title):
+                continue
+
+            if number not in toc:
+                toc[number] = title
+                expected_numbers.append(number)
+
+    return toc, expected_numbers
+
+
+def looks_like_amendment_note(text):
+    """
+    Reject numbered footnotes such as:
+
+        1. Ins. by Act 38 of 2002...
+        2. Subs. by s. 5...
+        3. The words "... omitted...
+    """
+
+    normalized = text.strip().lower()
+
+    for prefix in AMENDMENT_NOTE_PREFIXES:
+        if normalized.startswith(prefix):
+            return True
+
+    # Most amendment notes contain these patterns.
+    amendment_patterns = [
+        "w.e.f.",
+        "ibid.",
+        "for clause",
+        "for sub-section",
+        "for certain words",
+        "with effect from",
+    ]
+
+    for pattern in amendment_patterns:
+        if pattern in normalized:
+            return True
+
+    return False
+
+
+def is_valid_patents_section_heading(
+    number,
+    text,
+    expected_number,
+    toc_title
+):
+    """
+    Determine whether a numbered line is a genuine section heading.
+    """
+
+    # It must be the section we are currently expecting.
+    if number != expected_number:
+        return False
+
+    # Remove obvious amendment footnotes.
+    if looks_like_amendment_note(text):
+        return False
+
+    # Reject tiny garbage fragments such as:
+    # 73 .
+    # 133 ;]
+    if len(text.strip()) < 5:
+        return False
+
+    if not re.search(r"[A-Za-z]", text):
+        return False
+
+    # The body heading should correspond to the title in the TOC.
+    normalized_body = normalize_for_match(text)
+    normalized_toc = normalize_for_match(toc_title)
+
+    if not normalized_body.startswith(normalized_toc):
+        return False
+
+    return True
+
+
+def parse_patents_act(pages):
+    """
+    Parse the Patents Act using:
+
+        TOC → expected section sequence → actual body
+
+    This prevents numbered amendment footnotes and sub-content
+    from becoming fake sections.
+    """
+
+    body_page, body_line_index = find_patents_act_body_start(pages)
+
+    toc, expected_numbers = extract_patents_act_toc(
+        pages,
+        body_page
+    )
+
+    print(f"TOC sections detected : {len(expected_numbers)}")
+
+    sections = []
+
+    expected_index = 0
+    current_section = None
+
+    body_started = False
+
+    for page in pages:
+
+        page_number = page["page_number"]
+
+        # Skip everything before the Act body.
+        if page_number < body_page:
+            continue
+
+        lines = page["text"].splitlines()
+
+        for line_index, line in enumerate(lines):
+
+            # On the first body page, skip lines before Section 1.
+            if (
+                page_number == body_page
+                and not body_started
+                and line_index < body_line_index
+            ):
+                continue
+
+            body_started = True
+
+            match = SECTION_HEADING_RE.match(line)
+
+            if match:
+
+                number = match.group(1).upper()
+                remainder = match.group(2).strip()
+
+                if expected_index < len(expected_numbers):
+
+                    expected_number = expected_numbers[expected_index]
+
+                    toc_title = toc.get(
+                        expected_number,
+                        ""
+                    )
+
+                    if is_valid_patents_section_heading(
+                        number,
+                        remainder,
+                        expected_number,
+                        toc_title
+                    ):
+
+                        # Save previous section.
+                        if current_section is not None:
+                            current_section["page_end"] = page_number
+
+                            current_section["text"] = "\n".join(
+                                current_section.pop("_lines")
+                            ).strip()
+
+                            sections.append(current_section)
+
+                        current_section = {
+                            "number": number,
+                            "title": toc_title,
+                            "chapter": None,
+                            "part": None,
+                            "page_start": page_number,
+                            "page_end": page_number,
+                            "text": "",
+                            "_lines": [line],
+                        }
+
+                        expected_index += 1
+
+                        continue
+
+            # Track chapter information.
+            chapter = detect_chapter(line)
+
+            if chapter and current_section is not None:
+                current_section["chapter"] = chapter
+
+            # Track part information.
+            part = detect_part(line)
+
+            if part and current_section is not None:
+                current_section["part"] = part
+
+            # Add normal body text to current section.
+            if current_section is not None:
+                current_section["_lines"].append(line)
+
+    # Save final section.
+    if current_section is not None:
+
+        current_section["page_end"] = pages[-1]["page_number"]
+
+        current_section["text"] = "\n".join(
+            current_section.pop("_lines")
+        ).strip()
+
+        sections.append(current_section)
+
+    missing = expected_numbers[expected_index:]
+
+    print(f"Actual sections parsed   : {len(sections)}")
+
+    if missing:
+        print(
+            "WARNING: Sections not parsed:",
+            ", ".join(missing)
+        )
+
+    return sections
 
 # ============================================================
 # DOCUMENT STRUCTURING
 # ============================================================
 
-def build_sections(pages):
+def build_sections_generic(pages):
     """
     Convert extracted page text into approximate legal sections.
 
@@ -350,6 +645,15 @@ def build_sections(pages):
 
     return sections
 
+def build_sections(pages, document_id=None):
+    """
+    Select the appropriate parser for each document.
+    """
+
+    if document_id == "patents_act_1970":
+        return parse_patents_act(pages)
+
+    return build_sections_generic(pages)
 
 # ============================================================
 # JSON CREATION
@@ -428,7 +732,7 @@ def process_document(pdf_path: Path):
     # Parse structure
     # --------------------------------------------------------
 
-    sections = build_sections(pages)
+    sections = build_sections(pages, document_id=document_id)
 
     print(f"Sections found  : {len(sections)}")
 
