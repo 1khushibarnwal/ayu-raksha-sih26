@@ -1142,3 +1142,536 @@
     padding: 24px 16px;
   }
 }
+
+
+/* ========================================
+   AYU DASHBOARD
+======================================== */
+
+.dashboard-page-content {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* ========================================
+   WELCOME
+======================================== */
+
+.dashboard-welcome {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+
+  gap: 30px;
+
+  margin-bottom: 36px;
+}
+
+.dashboard-welcome h1 {
+  margin-top: 8px;
+  margin-bottom: 10px;
+
+  color: var(--color-text);
+
+  font-size: clamp(34px, 4vw, 52px);
+  line-height: 1.05;
+
+  letter-spacing: -0.035em;
+}
+
+.dashboard-welcome h1 span {
+  font-size: 0.8em;
+}
+
+.dashboard-welcome p {
+  color: var(--color-text-muted);
+  font-size: 16px;
+}
+
+.dashboard-date {
+  display: flex;
+  flex-direction: column;
+
+  align-items: flex-end;
+
+  color: var(--color-text-light);
+
+  font-size: 12px;
+}
+
+.dashboard-date strong {
+  margin-top: 5px;
+
+  color: var(--color-text-muted);
+
+  font-size: 13px;
+}
+
+/* ========================================
+   STAT CARDS
+======================================== */
+
+.stats-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(3, minmax(0, 1fr));
+
+  gap: 18px;
+
+  margin-bottom: 22px;
+}
+
+.stat-card {
+  min-height: 170px;
+
+  padding: 24px;
+
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+
+  background: var(--color-surface);
+
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-3px);
+
+  box-shadow: var(--shadow-md);
+}
+
+.stat-card-highlight {
+  background: #edf3e9;
+  border-color: #dce7d6;
+}
+
+.stat-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.stat-label {
+  color: var(--color-text-light);
+
+  font-size: 11px;
+  font-weight: 700;
+
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.stat-icon {
+  width: 38px;
+  height: 38px;
+
+  display: grid;
+  place-items: center;
+
+  border-radius: 12px;
+
+  background: var(--color-cream);
+
+  font-size: 17px;
+}
+
+.stat-value {
+  margin-top: 25px;
+
+  color: var(--color-primary-dark);
+
+  font-size: 35px;
+  font-weight: 700;
+
+  letter-spacing: -0.03em;
+}
+
+.stat-subtitle {
+  margin-top: 5px;
+
+  color: var(--color-text-light);
+
+  font-size: 13px;
+}
+
+/* ========================================
+   MAIN DASHBOARD GRID
+======================================== */
+
+.dashboard-main-grid {
+  display: grid;
+
+  grid-template-columns:
+    minmax(0, 1.45fr)
+    minmax(300px, 0.8fr);
+
+  gap: 22px;
+
+  margin-bottom: 22px;
+}
+
+/* ========================================
+   CARD HEADINGS
+======================================== */
+
+.card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+
+  margin-bottom: 30px;
+}
+
+.card-heading h2 {
+  margin-top: 6px;
+
+  color: var(--color-text);
+
+  font-size: 23px;
+  letter-spacing: -0.02em;
+}
+
+.card-heading-icon {
+  width: 40px;
+  height: 40px;
+
+  display: grid;
+  place-items: center;
+
+  border-radius: 50%;
+
+  background: var(--color-cream);
+
+  color: var(--color-primary);
+
+  font-size: 18px;
+}
+
+/* ========================================
+   WELLNESS CARD
+======================================== */
+
+.wellness-card {
+  padding: 28px;
+
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+
+  background: var(--color-surface);
+}
+
+.wellness-list {
+  display: flex;
+  flex-direction: column;
+
+  gap: 23px;
+}
+
+.wellness-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  margin-bottom: 9px;
+}
+
+.wellness-item-name {
+  display: flex;
+  align-items: center;
+
+  gap: 10px;
+}
+
+.wellness-item-name span {
+  width: 30px;
+  height: 30px;
+
+  display: grid;
+  place-items: center;
+
+  border-radius: 9px;
+
+  background: var(--color-cream);
+
+  font-size: 14px;
+}
+
+.wellness-item-name strong {
+  color: var(--color-text);
+
+  font-size: 14px;
+}
+
+.wellness-percentage {
+  color: var(--color-text-muted);
+
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.progress-track {
+  width: 100%;
+  height: 7px;
+
+  overflow: hidden;
+
+  border-radius: 999px;
+
+  background: #edf0e9;
+}
+
+.progress-fill {
+  height: 100%;
+
+  border-radius: inherit;
+
+  background: var(--color-primary);
+
+  transition: width 0.8s ease;
+}
+
+/* ========================================
+   AYU INSIGHT
+======================================== */
+
+.ayu-insight {
+  position: relative;
+
+  min-height: 100%;
+
+  overflow: hidden;
+
+  padding: 32px;
+
+  display: flex;
+  align-items: flex-end;
+
+  border-radius: 20px;
+
+  background:
+    linear-gradient(
+      145deg,
+      #183c2b,
+      #2f6b4f
+    );
+
+  color: white;
+}
+
+.insight-decoration {
+  position: absolute;
+
+  top: -25px;
+  right: -10px;
+
+  font-size: 130px;
+
+  opacity: 0.08;
+
+  transform: rotate(20deg);
+}
+
+.insight-content {
+  position: relative;
+
+  z-index: 1;
+}
+
+.insight-label {
+  display: inline-block;
+
+  margin-bottom: 16px;
+
+  font-size: 10px;
+  font-weight: 700;
+
+  letter-spacing: 0.14em;
+}
+
+.insight-content h2 {
+  max-width: 380px;
+
+  margin-bottom: 13px;
+
+  font-size: 28px;
+  line-height: 1.15;
+
+  letter-spacing: -0.025em;
+}
+
+.insight-content p {
+  max-width: 390px;
+
+  margin-bottom: 24px;
+
+  color: rgba(255, 255, 255, 0.72);
+
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.insight-link {
+  display: inline-flex;
+  align-items: center;
+
+  gap: 9px;
+
+  color: white;
+
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.insight-link span {
+  transition: transform 0.2s ease;
+}
+
+.insight-link:hover span {
+  transform: translateX(4px);
+}
+
+/* ========================================
+   QUICK ACTIONS
+======================================== */
+
+.quick-actions-section {
+  margin-bottom: 20px;
+}
+
+.quick-actions-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(3, minmax(0, 1fr));
+
+  gap: 16px;
+}
+
+.quick-action {
+  position: relative;
+
+  display: flex;
+  align-items: center;
+
+  gap: 15px;
+
+  padding: 20px;
+
+  border: 1px solid var(--color-border);
+  border-radius: 17px;
+
+  background: var(--color-surface);
+
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.quick-action:hover {
+  transform: translateY(-3px);
+
+  border-color: #cddbc7;
+
+  box-shadow: var(--shadow-sm);
+}
+
+.quick-action-icon {
+  width: 44px;
+  height: 44px;
+
+  flex-shrink: 0;
+
+  display: grid;
+  place-items: center;
+
+  border-radius: 13px;
+
+  background: var(--color-cream);
+
+  font-size: 19px;
+}
+
+.quick-action h3 {
+  margin-bottom: 4px;
+
+  color: var(--color-text);
+
+  font-size: 14px;
+}
+
+.quick-action p {
+  color: var(--color-text-light);
+
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.quick-action-arrow {
+  margin-left: auto;
+
+  color: var(--color-text-light);
+
+  transition: transform 0.2s ease;
+}
+
+.quick-action:hover .quick-action-arrow {
+  transform: translateX(4px);
+
+  color: var(--color-primary);
+}
+
+/* ========================================
+   DASHBOARD RESPONSIVE
+======================================== */
+
+@media (max-width: 1000px) {
+  .dashboard-main-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .quick-actions-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 800px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-welcome {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .dashboard-date {
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 500px) {
+  .dashboard-welcome h1 {
+    font-size: 34px;
+  }
+
+  .stat-card {
+    min-height: 150px;
+
+    padding: 20px;
+  }
+
+  .wellness-card,
+  .ayu-insight {
+    padding: 22px;
+  }
+
+  .insight-content h2 {
+    font-size: 24px;
+  }
+}
+
