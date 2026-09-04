@@ -1,4 +1,4 @@
-import { Link, Outlet } from 'react-router-dom'
+import { NavLink, Outlet } from 'react-router-dom'
 import Logo from './Logo'
 
 function DashboardLayout() {
@@ -9,72 +9,92 @@ function DashboardLayout() {
       <aside className="dashboard-sidebar">
 
         <div className="sidebar-header">
-          <Link to="/">
+          <NavLink to="/">
             <Logo />
-          </Link>
+          </NavLink>
         </div>
 
         <nav className="sidebar-nav">
 
-          <Link
+          {/* DASHBOARD */}
+          <NavLink
             to="/dashboard"
-            className="sidebar-link active"
+            end
+            className={({ isActive }) =>
+              `sidebar-link ${isActive ? 'sidebar-link-active' : ''}`
+            }
           >
             <span>⌂</span>
             Dashboard
-          </Link>
+          </NavLink>
 
-          <Link
+          {/* MY HEALTH */}
+          <NavLink
             to="/dashboard/health"
-            className="sidebar-link"
+            className={({ isActive }) =>
+              `sidebar-link ${isActive ? 'sidebar-link-active' : ''}`
+            }
           >
             <span>♡</span>
             My Health
-          </Link>
+          </NavLink>
 
-          <Link
+          {/* ASSESSMENT */}
+          <NavLink
             to="/dashboard/assessment"
-            className="sidebar-link"
+            className={({ isActive }) =>
+              `sidebar-link ${isActive ? 'sidebar-link-active' : ''}`
+            }
           >
             <span>✦</span>
             Assessment
-          </Link>
+          </NavLink>
 
-          <Link
+          {/* INSIGHTS */}
+          <NavLink
             to="/dashboard/insights"
-            className="sidebar-link"
+            className={({ isActive }) =>
+              `sidebar-link ${isActive ? 'sidebar-link-active' : ''}`
+            }
           >
             <span>◈</span>
             Insights
-          </Link>
+          </NavLink>
 
-          <Link
+          {/* HISTORY */}
+          <NavLink
             to="/dashboard/history"
-            className="sidebar-link"
+            className={({ isActive }) =>
+              `sidebar-link ${isActive ? 'sidebar-link-active' : ''}`
+            }
           >
             <span>◷</span>
             History
-          </Link>
+          </NavLink>
 
         </nav>
 
         <div className="sidebar-bottom">
 
-          <Link
+          {/* SETTINGS */}
+          <NavLink
             to="/dashboard/settings"
-            className="sidebar-link"
+            className={({ isActive }) =>
+              `sidebar-link ${isActive ? 'sidebar-link-active' : ''}`
+            }
           >
             <span>⚙</span>
             Settings
-          </Link>
+          </NavLink>
 
-          <Link
+          {/* LOG OUT */}
+          <NavLink
             to="/"
             className="sidebar-link logout-link"
           >
             <span>↪</span>
             Log out
-          </Link>
+          </NavLink>
 
         </div>
 
@@ -92,6 +112,7 @@ function DashboardLayout() {
           </div>
 
           <div className="dashboard-user">
+
             <button className="notification-button">
               ♧
             </button>
@@ -103,6 +124,7 @@ function DashboardLayout() {
             <span className="user-name">
               User
             </span>
+
           </div>
 
         </header>

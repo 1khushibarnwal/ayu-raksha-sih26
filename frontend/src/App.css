@@ -973,7 +973,7 @@
   color: var(--color-primary);
 }
 
-.sidebar-link.active {
+.sidebar-link-active {
   background: #eaf0e7;
   color: var(--color-primary);
   font-weight: 600;
@@ -1103,7 +1103,7 @@
   }
 
   .sidebar-header .ayu-brand-name,
-  .sidebar-link:not(.active)::after {
+  .sidebar-header .ayu-brand-name {
     display: none;
   }
 
