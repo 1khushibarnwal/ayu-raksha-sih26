@@ -2,8 +2,13 @@ fastapi
 uvicorn[standard]
 python-dotenv
 pydantic
+pydantic-settings
 groq
 pymupdf
 sentence-transformers
 numpy
 scikit-learn
+sqlalchemy
+alembic
+psycopg[binary]
+python-multipart
