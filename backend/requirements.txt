@@ -12,3 +12,5 @@ sqlalchemy
 alembic
 psycopg[binary]
 python-multipart
+requests
+beautifulsoup4
