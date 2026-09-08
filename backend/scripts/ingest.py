@@ -1,3 +1,6 @@
+
+
+
 from pathlib import Path
 import json
 import re
@@ -10,6 +13,8 @@ from pypdf import PdfReader
 # PATHS
 # ============================================================
 
+# IMPORTANT:
+# This is __file__, NOT **file**
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 PDF_DIR = BASE_DIR / "data" / "pdfs"
@@ -49,13 +54,24 @@ DOCUMENT_METADATA = {
 
 def clean_line(line: str) -> str:
     """
-    Clean common PDF extraction artifacts from a single line.
+    Clean common PDF extraction artifacts.
     """
 
-    line = line.replace("\x00", " ")
-    line = line.replace("\u00ad", "")  # soft hyphen
+    if not isinstance(line, str):
+        return ""
 
-    # Collapse repeated whitespace
+    line = line.replace("\x00", " ")
+    line = line.replace("\u00ad", "")
+    line = line.replace("\u00a0", " ")
+
+    # Normalize common dash variants.
+    line = line.replace("‐", "-")
+    line = line.replace("-", "-")
+    line = line.replace("‒", "-")
+    line = line.replace("–", "–")
+    line = line.replace("—", "—")
+
+    # Collapse spaces/tabs.
     line = re.sub(r"[ \t]+", " ", line)
 
     return line.strip()
@@ -63,8 +79,11 @@ def clean_line(line: str) -> str:
 
 def clean_page_text(text: str) -> str:
     """
-    Clean extracted text while preserving line structure.
+    Clean extracted page text while preserving line structure.
     """
+
+    if not text:
+        return ""
 
     lines = []
 
@@ -83,11 +102,20 @@ def clean_page_text(text: str) -> str:
 
 def extract_pdf(pdf_path: Path):
     """
-    Extract text from every page of a PDF.
+    Extract text from every page.
 
     Returns:
-        pages: list of dictionaries containing page number and text
-        full_text: complete document text
+        pages:
+            [
+                {
+                    "page_number": 1,
+                    "text": "..."
+                },
+                ...
+            ]
+
+        full_text:
+            Complete document text.
     """
 
     print(f"\nReading: {pdf_path.name}")
@@ -97,8 +125,10 @@ def extract_pdf(pdf_path: Path):
     pages = []
 
     for page_number, page in enumerate(reader.pages, start=1):
+
         try:
             text = page.extract_text() or ""
+
         except Exception as exc:
             print(
                 f"  WARNING: Could not extract page "
@@ -110,7 +140,7 @@ def extract_pdf(pdf_path: Path):
 
         pages.append(
             {
-                "page": page_number,
+                "page_number": page_number,
                 "text": text,
             }
         )
@@ -130,11 +160,11 @@ def extract_pdf(pdf_path: Path):
 
 def detect_chapter(line: str):
     """
-    Detect chapter headings such as:
+    Detect:
 
         CHAPTER I
         CHAPTER II
-        Chapter III
+        CHAPTER III
         CHAPTER 1
     """
 
@@ -152,11 +182,12 @@ def detect_chapter(line: str):
 
 def detect_part(line: str):
     """
-    Detect part headings such as:
+    Detect:
 
         PART I
         PART II
         PART A
+        PART 1
     """
 
     match = re.match(
@@ -171,62 +202,123 @@ def detect_part(line: str):
     return match.group(1).upper()
 
 
+# ============================================================
+# SECTION NUMBER HELPERS
+# ============================================================
+
+SECTION_NUMBER_RE = re.compile(
+    r"^\s*(\d+[A-Z]?)\s*(?:\.\s*|\-\s*|\s+)(.*)$",
+    re.IGNORECASE,
+)
+
+
+EXPLICIT_SECTION_RE = re.compile(
+    r"^\s*SECTION\s+(\d+[A-Z]?)\s*\.?\s*(.*)$",
+    re.IGNORECASE,
+)
+
+
+EXPLICIT_RULE_RE = re.compile(
+    r"^\s*RULE\s+(\d+[A-Z]?)\s*\.?\s*(.*)$",
+    re.IGNORECASE,
+)
+
+
+def normalize_section_number(number: str) -> str:
+    """
+    Normalize:
+
+        11a -> 11A
+        117b -> 117B
+        5 -> 5
+    """
+
+    return number.strip().upper()
+
+
+def section_number_sort_key(number: str):
+    """
+    Natural ordering:
+
+        1
+        2
+        9
+        10
+        11
+        11A
+        11B
+        12
+        92A
+    """
+
+    match = re.match(
+        r"^(\d+)([A-Z]*)$",
+        number.upper(),
+    )
+
+    if not match:
+        return (999999, number)
+
+    return (
+        int(match.group(1)),
+        match.group(2),
+    )
+
+
 def detect_section(line: str):
     """
-    Detect common legal section/rule formats.
+    Generic section/rule detection.
 
     Examples:
 
         1. Short title
-        2. Definitions
-        11A. Publication of application
+        11A. Publication of applications
+        Section 8. Information
         Rule 3. Application
-        Section 8. Information...
     """
 
-    # Explicit "Section X"
-    match = re.match(
-        r"^\s*SECTION\s+(\d+[A-Z]?)\.?\s*(.*)$",
-        line,
-        re.IGNORECASE,
-    )
+    # --------------------------------------------------------
+    # Explicit Section
+    # --------------------------------------------------------
+
+    match = EXPLICIT_SECTION_RE.match(line)
 
     if match:
         return {
-            "number": match.group(1),
+            "number": normalize_section_number(
+                match.group(1)
+            ),
             "title": match.group(2).strip(),
         }
 
-    # Explicit "Rule X"
-    match = re.match(
-        r"^\s*RULE\s+(\d+[A-Z]?)\.?\s*(.*)$",
-        line,
-        re.IGNORECASE,
-    )
+    # --------------------------------------------------------
+    # Explicit Rule
+    # --------------------------------------------------------
+
+    match = EXPLICIT_RULE_RE.match(line)
 
     if match:
         return {
-            "number": match.group(1),
+            "number": normalize_section_number(
+                match.group(1)
+            ),
             "title": match.group(2).strip(),
         }
 
-    # Normal numbered legal provision:
-    #
-    # 1. Short title
-    # 11A. Publication of application
-    #
-    match = re.match(
-        r"^\s*(\d+[A-Z]?)\.\s+(.+)$",
-        line,
-    )
+    # --------------------------------------------------------
+    # Normal numbered provision
+    # --------------------------------------------------------
+
+    match = SECTION_NUMBER_RE.match(line)
 
     if match:
-        number = match.group(1)
+        number = normalize_section_number(
+            match.group(1)
+        )
+
         title = match.group(2).strip()
 
-        # Avoid treating ordinary numbered lists as legal sections.
-        # Legal headings generally have reasonably short titles.
-        if len(title) <= 250:
+        if len(title) <= 300:
             return {
                 "number": number,
                 "title": title,
@@ -234,126 +326,344 @@ def detect_section(line: str):
 
     return None
 
+
 # ============================================================
-# PATENTS ACT — SPECIALIZED SECTION PARSER
+# PATENTS ACT
 # ============================================================
 
-SECTION_HEADING_RE = re.compile(
-    r"^\s*(\d+[A-Z]?)\.\s+(.+?)\s*$"
-)
-
-AMENDMENT_NOTE_PREFIXES = (
-    "ins. by",
-    "subs. by",
-    "clause",
-    "sub-clause",
-    "omitted by",
-    "inserted by",
-    "substituted by",
-    "the words",
-    "the proviso",
-    "vide notification",
+PATENTS_SECTION_RE = re.compile(
+    r"^\s*(\d+[A-Z]?)\s*\.\s*(.*?)\s*$",
+    re.IGNORECASE,
 )
 
 
-def normalize_for_match(text):
+def normalize_for_match(text: str) -> str:
     """
-    Normalize text so that minor PDF extraction differences
-    in punctuation/spacing do not affect comparisons.
+    Normalize text for title comparison.
     """
-    return re.sub(r"[^a-z0-9]+", " ", text.lower()).strip()
+
+    if not text:
+        return ""
+
+    return re.sub(
+        r"[^a-z0-9]+",
+        " ",
+        text.lower(),
+    ).strip()
+
+
+def clean_section_heading_text(text: str) -> str:
+    """
+    Clean a possible section heading.
+
+    This deliberately does NOT destroy the original
+    body text. It is only used for title matching.
+    """
+
+    if not text:
+        return ""
+
+    text = text.strip()
+
+    # Remove common PDF spacing.
+    text = re.sub(
+        r"\s+",
+        " ",
+        text,
+    )
+
+    return text.strip()
+
+
+def looks_like_toc_page(page_text: str) -> bool:
+    """
+    Detect the Patents Act Table of Contents.
+    """
+
+    if not page_text:
+        return False
+
+    upper = page_text.upper()
+
+    return (
+        "ARRANGEMENT OF SECTIONS" in upper
+        or (
+            "CHAPTER I" in upper
+            and "PRELIMINARY" in upper
+            and "SECTIONS" in upper
+        )
+    )
 
 
 def find_patents_act_body_start(pages):
     """
-    Find the first real occurrence of Section 1 in the Act body.
+    Locate the actual beginning of the Patents Act.
 
-    The TOC also contains:
-        1. Short title, extent and commencement.
+    IMPORTANT:
+    This function accepts either:
 
-    We distinguish the real body because it contains:
-        This Act may be called the Patents Act, 1970.
+        pages
+
+    or accidentally:
+
+        (pages, full_text)
+
     """
+
+    # --------------------------------------------------------
+    # Safety: support extract_pdf() tuple.
+    # --------------------------------------------------------
+
+    if (
+        isinstance(pages, tuple)
+        and len(pages) == 2
+        and isinstance(pages[0], list)
+    ):
+        pages = pages[0]
+
+    if not isinstance(pages, list):
+        raise TypeError(
+            "find_patents_act_body_start() expected "
+            "a list of page dictionaries."
+        )
+
+    # --------------------------------------------------------
+    # Strong body-start markers.
+    # --------------------------------------------------------
+
+    body_markers = [
+        "This Act may be called the Patents Act, 1970",
+        "BE it enacted by Parliament",
+        "Short title, extent and commencement",
+    ]
 
     for page in pages:
-        for line_index, line in enumerate(page["text"].splitlines()):
 
-            if "This Act may be called the Patents Act, 1970" in line:
-                return page["page_number"], line_index
+        page_text = page.get("text", "")
 
-    raise ValueError(
-        "Could not locate the beginning of the Patents Act body."
-    )
+        for line_index, line in enumerate(
+            page_text.splitlines()
+        ):
 
+            for marker in body_markers:
 
-def extract_patents_act_toc(pages, body_page):
-    """
-    Extract the section sequence from the Table of Contents.
+                if marker.lower() in line.lower():
 
-    The TOC is extremely useful because it tells us which section
-    numbers are actually valid.
-    """
+                    return (
+                        page["page_number"],
+                        line_index,
+                    )
 
-    toc = {}
-    expected_numbers = []
+    # --------------------------------------------------------
+    # Fallback:
+    # Find Section 1 after the TOC.
+    # --------------------------------------------------------
+
+    toc_seen = False
 
     for page in pages:
 
-        if page["page_number"] >= body_page:
-            break
+        text = page.get("text", "")
 
-        for line in page["text"].splitlines():
+        if looks_like_toc_page(text):
+            toc_seen = True
+            continue
 
-            match = SECTION_HEADING_RE.match(line)
+        if not toc_seen:
+            continue
+
+        for line_index, line in enumerate(
+            text.splitlines()
+        ):
+
+            match = PATENTS_SECTION_RE.match(line)
 
             if not match:
                 continue
 
-            number = match.group(1).upper()
+            number = normalize_section_number(
+                match.group(1)
+            )
+
+            if number == "1":
+
+                return (
+                    page["page_number"],
+                    line_index,
+                )
+
+    raise ValueError(
+        "Could not locate the beginning of the "
+        "Patents Act body."
+    )
+
+
+# ============================================================
+# PATENTS ACT TOC
+# ============================================================
+
+def extract_patents_act_toc(
+    pages,
+    body_page,
+):
+    """
+    Extract the Patents Act TOC.
+
+    Handles both:
+
+        11A. Publication of application.
+
+    and cases where PDF extraction separates
+    the number and title across lines.
+    """
+
+    # --------------------------------------------------------
+    # Safety for tuple input.
+    # --------------------------------------------------------
+
+    if (
+        isinstance(pages, tuple)
+        and len(pages) == 2
+        and isinstance(pages[0], list)
+    ):
+        pages = pages[0]
+
+    toc = {}
+    expected_numbers = []
+
+    page_index = 0
+
+    while page_index < len(pages):
+
+        page = pages[page_index]
+
+        if page["page_number"] >= body_page:
+            break
+
+        lines = page["text"].splitlines()
+
+        line_index = 0
+
+        while line_index < len(lines):
+
+            line = lines[line_index].strip()
+
+            match = PATENTS_SECTION_RE.match(
+                line
+            )
+
+            if not match:
+                line_index += 1
+                continue
+
+            number = normalize_section_number(
+                match.group(1)
+            )
+
             title = match.group(2).strip()
 
-            # Ignore obviously invalid fragments.
-            if len(title) < 5:
-                continue
+            # ------------------------------------------------
+            # If title is empty, PDF extraction probably
+            # placed it on the following line.
+            # ------------------------------------------------
 
-            if not re.search(r"[A-Za-z]", title):
-                continue
+            if not title and line_index + 1 < len(lines):
 
-            if number not in toc:
-                toc[number] = title
-                expected_numbers.append(number)
+                next_line = lines[
+                    line_index + 1
+                ].strip()
+
+                # Do not consume obvious structural lines.
+                if (
+                    next_line
+                    and not re.match(
+                        r"^(CHAPTER|PART|SECTIONS?)\b",
+                        next_line,
+                        re.IGNORECASE,
+                    )
+                ):
+                    title = next_line
+                    line_index += 1
+
+            # ------------------------------------------------
+            # Ignore invalid fragments.
+            # ------------------------------------------------
+
+            if (
+                len(title) >= 3
+                and re.search(
+                    r"[A-Za-z]",
+                    title,
+                )
+            ):
+
+                if number not in toc:
+
+                    toc[number] = title
+                    expected_numbers.append(
+                        number
+                    )
+
+            line_index += 1
+
+        page_index += 1
 
     return toc, expected_numbers
 
 
-def looks_like_amendment_note(text):
+# ============================================================
+# PATENTS ACT HEADING VALIDATION
+# ============================================================
+
+def title_matches_toc(
+    extracted_title: str,
+    toc_title: str,
+) -> bool:
     """
-    Reject numbered footnotes such as:
+    Loose comparison between actual heading and TOC title.
 
-        1. Ins. by Act 38 of 2002...
-        2. Subs. by s. 5...
-        3. The words "... omitted...
+    The comparison intentionally tolerates:
+        - punctuation changes
+        - amendment markers
+        - extra PDF-extracted material
+        - minor OCR/extraction differences
     """
 
-    normalized = text.strip().lower()
+    extracted = normalize_for_match(
+        extracted_title
+    )
 
-    for prefix in AMENDMENT_NOTE_PREFIXES:
-        if normalized.startswith(prefix):
-            return True
+    expected = normalize_for_match(
+        toc_title
+    )
 
-    # Most amendment notes contain these patterns.
-    amendment_patterns = [
-        "w.e.f.",
-        "ibid.",
-        "for clause",
-        "for sub-section",
-        "for certain words",
-        "with effect from",
-    ]
+    if not extracted or not expected:
+        return False
 
-    for pattern in amendment_patterns:
-        if pattern in normalized:
-            return True
+    if extracted == expected:
+        return True
+
+    if extracted.startswith(expected):
+        return True
+
+    if expected.startswith(extracted):
+        return True
+
+    extracted_words = extracted.split()
+    expected_words = expected.split()
+
+    compare_count = min(
+        6,
+        len(extracted_words),
+        len(expected_words),
+    )
+
+    if compare_count >= 2:
+
+        return (
+            extracted_words[:compare_count]
+            == expected_words[:compare_count]
+        )
 
     return False
 
@@ -361,79 +671,146 @@ def looks_like_amendment_note(text):
 def is_valid_patents_section_heading(
     number,
     text,
-    expected_number,
-    toc_title
+    expected_numbers,
+    toc,
 ):
     """
-    Determine whether a numbered line is a genuine section heading.
+    Validate a Patents Act section heading.
+
+    The TOC is used as a validation set, but the body does
+    NOT have to follow the TOC perfectly.
     """
 
-    # It must be the section we are currently expecting.
-    if number != expected_number:
-        return False
-
-    # Remove obvious amendment footnotes.
-    if looks_like_amendment_note(text):
-        return False
-
-    # Reject tiny garbage fragments such as:
-    # 73 .
-    # 133 ;]
-    if len(text.strip()) < 5:
-        return False
-
-    if not re.search(r"[A-Za-z]", text):
-        return False
-
-    # The body heading should correspond to the title in the TOC.
-    normalized_body = normalize_for_match(text)
-    normalized_toc = normalize_for_match(toc_title)
-
-    if not normalized_body.startswith(normalized_toc):
-        return False
-
-    return True
-
-
-def parse_patents_act(pages):
-    """
-    Parse the Patents Act using:
-
-        TOC → expected section sequence → actual body
-
-    This prevents numbered amendment footnotes and sub-content
-    from becoming fake sections.
-    """
-
-    body_page, body_line_index = find_patents_act_body_start(pages)
-
-    toc, expected_numbers = extract_patents_act_toc(
-        pages,
-        body_page
+    number = normalize_section_number(
+        number
     )
 
-    print(f"TOC sections detected : {len(expected_numbers)}")
+    # --------------------------------------------------------
+    # Must exist in TOC.
+    # --------------------------------------------------------
 
-    sections = []
+    if number not in expected_numbers:
+        return False
 
-    expected_index = 0
-    current_section = None
+    cleaned = clean_section_heading_text(
+        text
+    )
+
+    # --------------------------------------------------------
+    # Some sections such as:
+    #
+    # 5. [Omitted.]
+    #
+    # are valid even though their body is short.
+    # --------------------------------------------------------
+
+    if not cleaned:
+        return True
+
+    if not re.search(
+        r"[A-Za-z]",
+        cleaned,
+    ):
+        return False
+
+    toc_title = toc.get(
+        number,
+        "",
+    )
+
+    if not toc_title:
+        return True
+
+    return title_matches_toc(
+        cleaned,
+        toc_title,
+    )
+
+
+# ============================================================
+# PATENTS ACT — BODY HEADING EXTRACTION
+# ============================================================
+
+def find_next_nonempty_line(
+    lines,
+    start_index,
+):
+    """
+    Return:
+        (index, line)
+
+    for the next non-empty line.
+    """
+
+    index = start_index + 1
+
+    while index < len(lines):
+
+        value = lines[index].strip()
+
+        if value:
+            return index, value
+
+        index += 1
+
+    return None, ""
+
+
+def extract_patents_body_candidates(
+    pages,
+    body_page,
+    body_line_index,
+):
+    """
+    Extract possible section headings from the actual Act body.
+
+    This is intentionally tolerant.
+
+    It supports:
+
+        10. Title text
+
+    and:
+
+        10.
+        Title text
+
+    and:
+
+        11A. Publication of applications
+
+    and:
+
+        11A
+        Publication of applications
+    """
+
+    candidates = []
 
     body_started = False
+
+    current_chapter = None
+    current_part = None
 
     for page in pages:
 
         page_number = page["page_number"]
 
-        # Skip everything before the Act body.
         if page_number < body_page:
             continue
 
         lines = page["text"].splitlines()
 
-        for line_index, line in enumerate(lines):
+        for line_index, raw_line in enumerate(
+            lines
+        ):
 
-            # On the first body page, skip lines before Section 1.
+            line = raw_line.strip()
+
+            # ------------------------------------------------
+            # Skip text before actual body.
+            # ------------------------------------------------
+
             if (
                 page_number == body_page
                 and not body_started
@@ -443,106 +820,661 @@ def parse_patents_act(pages):
 
             body_started = True
 
-            match = SECTION_HEADING_RE.match(line)
+            # ------------------------------------------------
+            # Chapter.
+            # ------------------------------------------------
+
+            chapter = detect_chapter(line)
+
+            if chapter:
+                current_chapter = chapter
+                continue
+
+            # ------------------------------------------------
+            # Part.
+            # ------------------------------------------------
+
+            part = detect_part(line)
+
+            if part:
+                current_part = part
+                continue
+
+            # ------------------------------------------------
+            # Standard:
+            #
+            # 11A. Publication...
+            # ------------------------------------------------
+
+            match = PATENTS_SECTION_RE.match(
+                line
+            )
 
             if match:
 
-                number = match.group(1).upper()
-                remainder = match.group(2).strip()
+                number = normalize_section_number(
+                    match.group(1)
+                )
 
-                if expected_index < len(expected_numbers):
+                title = match.group(2).strip()
 
-                    expected_number = expected_numbers[expected_index]
+                # ------------------------------------------------
+                # Handle:
+                #
+                # 11A.
+                # Publication...
+                # ------------------------------------------------
 
-                    toc_title = toc.get(
-                        expected_number,
-                        ""
+                if not title:
+
+                    next_index, next_line = (
+                        find_next_nonempty_line(
+                            lines,
+                            line_index,
+                        )
                     )
 
-                    if is_valid_patents_section_heading(
-                        number,
-                        remainder,
-                        expected_number,
-                        toc_title
+                    if next_line:
+
+                        # Do not consume a new section.
+                        if not PATENTS_SECTION_RE.match(
+                            next_line
+                        ):
+
+                            title = next_line
+
+                candidates.append(
+                    {
+                        "number": number,
+                        "title": title,
+                        "page_number": page_number,
+                        "line_index": line_index,
+                        "chapter": current_chapter,
+                        "part": current_part,
+                    }
+                )
+
+                continue
+
+            # ------------------------------------------------
+            # Handle:
+            #
+            # 11A
+            #
+            # followed by:
+            #
+            # Publication of applications
+            #
+            # ------------------------------------------------
+
+            number_only_match = re.match(
+                r"^\s*(\d+[A-Z]?)\s*$",
+                line,
+                re.IGNORECASE,
+            )
+
+            if number_only_match:
+
+                number = normalize_section_number(
+                    number_only_match.group(1)
+                )
+
+                next_index, next_line = (
+                    find_next_nonempty_line(
+                        lines,
+                        line_index,
+                    )
+                )
+
+                if next_line:
+
+                    if (
+                        not PATENTS_SECTION_RE.match(
+                            next_line
+                        )
                     ):
 
-                        # Save previous section.
-                        if current_section is not None:
-                            current_section["page_end"] = page_number
+                        candidates.append(
+                            {
+                                "number": number,
+                                "title": next_line,
+                                "page_number": page_number,
+                                "line_index": line_index,
+                                "chapter": current_chapter,
+                                "part": current_part,
+                            }
+                        )
 
-                            current_section["text"] = "\n".join(
-                                current_section.pop("_lines")
-                            ).strip()
+    return candidates
 
-                            sections.append(current_section)
 
-                        current_section = {
-                            "number": number,
-                            "title": toc_title,
-                            "chapter": None,
-                            "part": None,
-                            "page_start": page_number,
-                            "page_end": page_number,
-                            "text": "",
-                            "_lines": [line],
-                        }
+# ============================================================
+# PATENTS ACT — FINAL PARSER
+# ============================================================
 
-                        expected_index += 1
+def parse_patents_act(pages):
+    """
+    Final Patents Act parser.
 
-                        continue
+    IMPORTANT DESIGN:
 
-            # Track chapter information.
-            chapter = detect_chapter(line)
+    We do NOT require every TOC entry to have a matching body
+    paragraph.
 
-            if chapter and current_section is not None:
-                current_section["chapter"] = chapter
+    Instead:
 
-            # Track part information.
-            part = detect_part(line)
+        1. Extract the PDF.
+        2. Find actual Act body.
+        3. Extract TOC.
+        4. Find actual body headings.
+        5. Match body headings to TOC.
+        6. Keep all successfully located sections.
+        7. Add TOC-only entries for sections which are omitted,
+           missing from extraction, or represented only in TOC.
 
-            if part and current_section is not None:
-                current_section["part"] = part
+    Therefore we preserve the legal document's section list
+    without inventing body text.
+    """
 
-            # Add normal body text to current section.
-            if current_section is not None:
-                current_section["_lines"].append(line)
+    # --------------------------------------------------------
+    # Safety.
+    # --------------------------------------------------------
 
-    # Save final section.
-    if current_section is not None:
+    if (
+        isinstance(pages, tuple)
+        and len(pages) == 2
+        and isinstance(pages[0], list)
+    ):
+        pages = pages[0]
 
-        current_section["page_end"] = pages[-1]["page_number"]
+    if not isinstance(pages, list):
+        raise TypeError(
+            "parse_patents_act() expected a list "
+            "of page dictionaries."
+        )
 
-        current_section["text"] = "\n".join(
-            current_section.pop("_lines")
+    # --------------------------------------------------------
+    # Find body.
+    # --------------------------------------------------------
+
+    body_page, body_line_index = (
+        find_patents_act_body_start(
+            pages
+        )
+    )
+
+    print(
+        f"Patents Act body starts : "
+        f"page {body_page}, "
+        f"line {body_line_index}"
+    )
+
+    # --------------------------------------------------------
+    # Extract TOC.
+    # --------------------------------------------------------
+
+    toc, expected_numbers = (
+        extract_patents_act_toc(
+            pages,
+            body_page,
+        )
+    )
+
+    print(
+        f"TOC sections detected : "
+        f"{len(expected_numbers)}"
+    )
+
+    expected_set = set(
+        expected_numbers
+    )
+
+    # --------------------------------------------------------
+    # Find actual body candidates.
+    # --------------------------------------------------------
+
+    candidates = (
+        extract_patents_body_candidates(
+            pages,
+            body_page,
+            body_line_index,
+        )
+    )
+
+    print(
+        f"Body heading candidates : "
+        f"{len(candidates)}"
+    )
+
+    # --------------------------------------------------------
+    # Match candidates against TOC.
+    # --------------------------------------------------------
+
+    located = {}
+
+    for candidate in candidates:
+
+        number = candidate[
+            "number"
+        ]
+
+        if number not in expected_set:
+            continue
+
+        title = candidate[
+            "title"
+        ]
+
+        toc_title = toc.get(
+            number,
+            "",
+        )
+
+        valid = (
+            is_valid_patents_section_heading(
+                number=number,
+                text=title,
+                expected_numbers=expected_set,
+                toc=toc,
+            )
+        )
+
+        # ----------------------------------------------------
+        # If title validation fails, still allow an exact
+        # section number when the TOC marks it as omitted.
+        # ----------------------------------------------------
+
+        if not valid:
+
+            normalized_toc = (
+                normalize_for_match(
+                    toc_title
+                )
+            )
+
+            if "omitted" not in normalized_toc:
+                continue
+
+        # ----------------------------------------------------
+        # First occurrence wins.
+        # ----------------------------------------------------
+
+        if number not in located:
+
+            located[number] = candidate
+
+    # --------------------------------------------------------
+    # Determine body positions.
+    # --------------------------------------------------------
+
+    sorted_located = sorted(
+        located.values(),
+        key=lambda item: (
+            item["page_number"],
+            item["line_index"],
+        ),
+    )
+
+    # --------------------------------------------------------
+    # Build body section objects.
+    # --------------------------------------------------------
+
+    sections = []
+
+    for index, candidate in enumerate(
+        sorted_located
+    ):
+
+        number = candidate[
+            "number"
+        ]
+
+        start_page = candidate[
+            "page_number"
+        ]
+
+        start_line = candidate[
+            "line_index"
+        ]
+
+        # ----------------------------------------------------
+        # End position:
+        # next located section.
+        # ----------------------------------------------------
+
+        if index + 1 < len(
+            sorted_located
+        ):
+
+            next_candidate = (
+                sorted_located[
+                    index + 1
+                ]
+            )
+
+            end_page = (
+                next_candidate[
+                    "page_number"
+                ]
+            )
+
+        else:
+
+            end_page = pages[-1][
+                "page_number"
+            ]
+
+        # ----------------------------------------------------
+        # Extract complete section body from start heading
+        # until the next located heading.
+        # ----------------------------------------------------
+
+        body_lines = []
+
+        collecting = False
+
+        for page in pages:
+
+            page_number = page[
+                "page_number"
+            ]
+
+            if page_number < start_page:
+                continue
+
+            if page_number > end_page:
+                break
+
+            lines = page[
+                "text"
+            ].splitlines()
+
+            for line_index, line in enumerate(
+                lines
+            ):
+
+                if (
+                    page_number == start_page
+                    and line_index < start_line
+                ):
+                    continue
+
+                # ------------------------------------------------
+                # Stop at the next section.
+                # ------------------------------------------------
+
+                if (
+                    page_number == end_page
+                    and index + 1 < len(
+                        sorted_located
+                    )
+                ):
+
+                    next_candidate = (
+                        sorted_located[
+                            index + 1
+                        ]
+                    )
+
+                    if (
+                        page_number
+                        == next_candidate[
+                            "page_number"
+                        ]
+                        and line_index
+                        >= next_candidate[
+                            "line_index"
+                        ]
+                    ):
+                        collecting = False
+                        break
+
+                collecting = True
+
+                if collecting:
+                    body_lines.append(
+                        line
+                    )
+
+            if (
+                index + 1 < len(
+                    sorted_located
+                )
+            ):
+
+                next_candidate = (
+                    sorted_located[
+                        index + 1
+                    ]
+                )
+
+                if (
+                    page_number
+                    == next_candidate[
+                        "page_number"
+                    ]
+                ):
+                    break
+
+        # ----------------------------------------------------
+        # Remove empty lines.
+        # ----------------------------------------------------
+
+        body_lines = [
+            line.strip()
+            for line in body_lines
+            if line.strip()
+        ]
+
+        body_text = "\n".join(
+            body_lines
         ).strip()
 
-        sections.append(current_section)
+        toc_title = toc.get(
+            number,
+            candidate["title"],
+        )
 
-    missing = expected_numbers[expected_index:]
+        # ----------------------------------------------------
+        # Detect omitted sections.
+        # ----------------------------------------------------
 
-    print(f"Actual sections parsed   : {len(sections)}")
+        status = "located"
 
-    if missing:
+        if "omitted" in normalize_for_match(
+            toc_title
+        ):
+            status = "omitted"
+
+        sections.append(
+            {
+                "number": number,
+                "title": toc_title,
+                "chapter": candidate[
+                    "chapter"
+                ],
+                "part": candidate[
+                    "part"
+                ],
+                "page_start": start_page,
+                "page_end": end_page,
+                "status": status,
+                "source": "body",
+                "text": body_text,
+            }
+        )
+
+    # ========================================================
+    # ADD TOC-ONLY SECTIONS
+    # ========================================================
+
+    located_numbers = {
+        section["number"]
+        for section in sections
+    }
+
+    missing_numbers = [
+        number
+        for number in expected_numbers
+        if number not in located_numbers
+    ]
+
+    # --------------------------------------------------------
+    # We preserve TOC entries which are not recoverable from
+    # the body.
+    #
+    # We do NOT fabricate their text.
+    # --------------------------------------------------------
+
+    for number in missing_numbers:
+
+        toc_title = toc.get(
+            number,
+            "",
+        )
+
+        normalized_title = (
+            normalize_for_match(
+                toc_title
+            )
+        )
+
+        if "omitted" in normalized_title:
+
+            status = "omitted"
+
+        else:
+
+            status = "toc_only"
+
+        sections.append(
+            {
+                "number": number,
+                "title": toc_title,
+                "chapter": None,
+                "part": None,
+                "page_start": None,
+                "page_end": None,
+                "status": status,
+                "source": "toc",
+                "text": "",
+            }
+        )
+
+    # --------------------------------------------------------
+    # Final ordering = TOC ordering.
+    #
+    # This is much more reliable than sorting:
+    # 11A, 11, 12, etc.
+    # --------------------------------------------------------
+
+    toc_position = {
+        number: index
+        for index, number in enumerate(
+            expected_numbers
+        )
+    }
+
+    sections.sort(
+        key=lambda section: toc_position.get(
+            section["number"],
+            999999,
+        )
+    )
+
+    # --------------------------------------------------------
+    # Final statistics.
+    # --------------------------------------------------------
+
+    located_count = sum(
+        1
+        for section in sections
+        if section["source"] == "body"
+    )
+
+    toc_only_count = sum(
+        1
+        for section in sections
+        if section["source"] == "toc"
+    )
+
+    omitted_count = sum(
+        1
+        for section in sections
+        if section["status"] == "omitted"
+    )
+
+    print(
+        f"Body sections located  : "
+        f"{located_count}"
+    )
+
+    print(
+        f"TOC-only sections      : "
+        f"{toc_only_count}"
+    )
+
+    print(
+        f"Omitted sections       : "
+        f"{omitted_count}"
+    )
+
+    print(
+        f"Final section records  : "
+        f"{len(sections)}"
+    )
+
+    if missing_numbers:
+
         print(
-            "WARNING: Sections not parsed:",
-            ", ".join(missing)
+            "TOC entries without recoverable "
+            "body text:"
+        )
+
+        print(
+            ", ".join(
+                missing_numbers
+            )
+        )
+
+        print(
+            "These are preserved as "
+            "'toc_only' records; no text "
+            "has been fabricated."
+        )
+
+    else:
+
+        print(
+            "All TOC sections located in "
+            "the extracted body."
         )
 
     return sections
 
+
 # ============================================================
-# DOCUMENT STRUCTURING
+# GENERIC DOCUMENT STRUCTURING
 # ============================================================
 
-def build_sections_generic(pages):
+def build_sections_generic(
+    pages,
+):
     """
-    Convert extracted page text into approximate legal sections.
+    Generic first-pass parser for Drugs Rules and
+    Cosmetics Rules.
 
-    IMPORTANT:
-    This is a first-pass structural parser.
-    It does not attempt to understand the legal meaning
-    of the document.
+    This is intentionally separate from the Patents Act
+    parser because the Patents Act has a reliable TOC that
+    can be used as a structural reference.
     """
+
+    if (
+        isinstance(pages, tuple)
+        and len(pages) == 2
+        and isinstance(pages[0], list)
+    ):
+        pages = pages[0]
 
     sections = []
 
@@ -551,8 +1483,14 @@ def build_sections_generic(pages):
     current_part = None
 
     for page in pages:
-        page_number = page["page"]
-        text = page["text"]
+
+        page_number = page[
+            "page_number"
+        ]
+
+        text = page[
+            "text"
+        ]
 
         if not text:
             continue
@@ -561,99 +1499,161 @@ def build_sections_generic(pages):
 
         for line in lines:
 
-            # -----------------------------------------------
-            # Chapter
-            # -----------------------------------------------
+            # ------------------------------------------------
+            # Chapter.
+            # ------------------------------------------------
 
-            chapter = detect_chapter(line)
+            chapter = detect_chapter(
+                line
+            )
 
             if chapter:
+
                 current_chapter = chapter
                 continue
 
-            # -----------------------------------------------
-            # Part
-            # -----------------------------------------------
+            # ------------------------------------------------
+            # Part.
+            # ------------------------------------------------
 
-            part = detect_part(line)
+            part = detect_part(
+                line
+            )
 
             if part:
+
                 current_part = part
                 continue
 
-            # -----------------------------------------------
-            # Section / Rule
-            # -----------------------------------------------
+            # ------------------------------------------------
+            # Section / Rule.
+            # ------------------------------------------------
 
-            detected = detect_section(line)
+            detected = detect_section(
+                line
+            )
 
             if detected:
 
-                # Save previous section
+                # Save previous.
                 if current_section:
-                    current_section["text"] = (
-                        "\n".join(current_section["text_lines"])
-                        .strip()
-                    )
 
-                    del current_section["text_lines"]
+                    current_section[
+                        "text"
+                    ] = "\n".join(
+                        current_section.pop(
+                            "_lines"
+                        )
+                    ).strip()
 
-                    current_section["page_end"] = (
+                    current_section[
+                        "page_end"
+                    ] = (
                         page_number - 1
-                        if page_number > current_section["page_start"]
+                        if page_number
+                        > current_section[
+                            "page_start"
+                        ]
                         else page_number
                     )
 
-                    sections.append(current_section)
+                    sections.append(
+                        current_section
+                    )
 
+                # Start new.
                 current_section = {
-                    "number": detected["number"],
-                    "title": detected["title"],
+                    "number": detected[
+                        "number"
+                    ],
+                    "title": detected[
+                        "title"
+                    ],
                     "chapter": current_chapter,
                     "part": current_part,
                     "page_start": page_number,
                     "page_end": page_number,
-                    "text_lines": [],
+                    "status": "located",
+                    "source": "body",
+                    "_lines": [],
                 }
 
-                # The heading itself is useful content.
-                if detected["title"]:
-                    current_section["text_lines"].append(
-                        detected["title"]
+                if detected[
+                    "title"
+                ]:
+
+                    current_section[
+                        "_lines"
+                    ].append(
+                        detected[
+                            "title"
+                        ]
                     )
 
                 continue
 
-            # -----------------------------------------------
-            # Section body
-            # -----------------------------------------------
+            # ------------------------------------------------
+            # Normal body text.
+            # ------------------------------------------------
 
             if current_section:
-                current_section["text_lines"].append(line)
 
-    # Save final section
+                current_section[
+                    "_lines"
+                ].append(
+                    line
+                )
+
+    # --------------------------------------------------------
+    # Save final section.
+    # --------------------------------------------------------
+
     if current_section:
 
-        current_section["text"] = (
-            "\n".join(current_section["text_lines"])
-            .strip()
+        current_section[
+            "text"
+        ] = "\n".join(
+            current_section.pop(
+                "_lines"
+            )
+        ).strip()
+
+        sections.append(
+            current_section
         )
-
-        del current_section["text_lines"]
-
-        sections.append(current_section)
 
     return sections
 
-def build_sections(pages, document_id=None):
+
+# ============================================================
+# DOCUMENT STRUCTURING
+# ============================================================
+
+def build_sections(
+    pages,
+    document_id=None,
+):
     """
-    Select the appropriate parser for each document.
+    Select parser according to document.
     """
+
+    if (
+        isinstance(pages, tuple)
+        and len(pages) == 2
+        and isinstance(pages[0], list)
+    ):
+        pages = pages[0]
 
     if document_id == "patents_act_1970":
-        return parse_patents_act(pages)
 
-    return build_sections_generic(pages)
+        return parse_patents_act(
+            pages
+        )
+
+    return build_sections_generic(
+        pages
+    )
+
 
 # ============================================================
 # JSON CREATION
@@ -666,6 +1666,10 @@ def create_document_json(
     full_text: str,
     sections,
 ):
+    """
+    Create final processed JSON.
+    """
+
     metadata = DOCUMENT_METADATA.get(
         document_id,
         {
@@ -677,19 +1681,28 @@ def create_document_json(
 
     return {
         "document_id": document_id,
-        "title": metadata["title"],
-        "source": metadata["source"],
-        "document_type": metadata["document_type"],
+        "title": metadata[
+            "title"
+        ],
+        "source": metadata[
+            "source"
+        ],
+        "document_type": metadata[
+            "document_type"
+        ],
         "filename": pdf_path.name,
         "ingested_at": datetime.now().isoformat(),
         "page_count": len(pages),
-        "character_count": len(full_text),
-        "section_count": len(sections),
-
+        "character_count": len(
+            full_text
+        ),
+        "section_count": len(
+            sections
+        ),
         "sections": sections,
 
-        # Keeping the page-level text is useful for
-        # debugging and future citation support.
+        # Preserve page-level text for
+        # debugging and citations.
         "pages": pages,
     }
 
@@ -698,57 +1711,90 @@ def create_document_json(
 # PROCESS ONE DOCUMENT
 # ============================================================
 
-def process_document(pdf_path: Path):
+def process_document(
+    pdf_path: Path,
+):
+    """
+    Process one PDF from extraction through JSON.
+    """
 
     document_id = pdf_path.stem
 
     print("\n" + "=" * 60)
-    print(f"PROCESSING: {pdf_path.name}")
+    print(
+        f"PROCESSING: {pdf_path.name}"
+    )
     print("=" * 60)
 
     # --------------------------------------------------------
-    # Extract
+    # Extract.
     # --------------------------------------------------------
 
-    pages, full_text = extract_pdf(pdf_path)
+    pages, full_text = extract_pdf(
+        pdf_path
+    )
 
-    print(f"Pages extracted : {len(pages)}")
-    print(f"Characters      : {len(full_text):,}")
+    print(
+        f"Pages extracted : "
+        f"{len(pages)}"
+    )
+
+    print(
+        f"Characters      : "
+        f"{len(full_text):,}"
+    )
 
     # --------------------------------------------------------
-    # Save raw text
+    # Save raw text.
     # --------------------------------------------------------
 
-    raw_path = RAW_DIR / f"{document_id}.txt"
+    raw_path = (
+        RAW_DIR
+        / f"{document_id}.txt"
+    )
 
     raw_path.write_text(
         full_text,
         encoding="utf-8",
     )
 
-    print(f"Raw text saved  : {raw_path}")
-
-    # --------------------------------------------------------
-    # Parse structure
-    # --------------------------------------------------------
-
-    sections = build_sections(pages, document_id=document_id)
-
-    print(f"Sections found  : {len(sections)}")
-
-    # --------------------------------------------------------
-    # Create JSON
-    # --------------------------------------------------------
-
-    document_json = create_document_json(
-        document_id=document_id,
-        pdf_path=pdf_path,
-        pages=pages,
-        full_text=full_text,
-        sections=sections,
+    print(
+        f"Raw text saved  : "
+        f"{raw_path}"
     )
 
-    json_path = PROCESSED_DIR / f"{document_id}.json"
+    # --------------------------------------------------------
+    # Parse structure.
+    # --------------------------------------------------------
+
+    sections = build_sections(
+        pages,
+        document_id=document_id,
+    )
+
+    print(
+        f"Sections found  : "
+        f"{len(sections)}"
+    )
+
+    # --------------------------------------------------------
+    # Create JSON.
+    # --------------------------------------------------------
+
+    document_json = (
+        create_document_json(
+            document_id=document_id,
+            pdf_path=pdf_path,
+            pages=pages,
+            full_text=full_text,
+            sections=sections,
+        )
+    )
+
+    json_path = (
+        PROCESSED_DIR
+        / f"{document_id}.json"
+    )
 
     json_path.write_text(
         json.dumps(
@@ -759,13 +1805,20 @@ def process_document(pdf_path: Path):
         encoding="utf-8",
     )
 
-    print(f"JSON saved      : {json_path}")
+    print(
+        f"JSON saved      : "
+        f"{json_path}"
+    )
 
     return {
         "document": document_id,
         "pages": len(pages),
-        "characters": len(full_text),
-        "sections": len(sections),
+        "characters": len(
+            full_text
+        ),
+        "sections": len(
+            sections
+        ),
         "json": json_path,
     }
 
@@ -777,42 +1830,75 @@ def process_document(pdf_path: Path):
 def main():
 
     print("=" * 60)
-    print(" AYU-RAKSHA DOCUMENT INGESTION")
+    print(
+        " AYU-RAKSHA DOCUMENT INGESTION"
+    )
     print("=" * 60)
 
-    pdf_files = sorted(PDF_DIR.glob("*.pdf"))
+    # --------------------------------------------------------
+    # Find PDFs.
+    # --------------------------------------------------------
+
+    pdf_files = sorted(
+        PDF_DIR.glob("*.pdf")
+    )
 
     if not pdf_files:
-        print("\nNo PDF files found.")
-        print(f"Expected directory:\n{PDF_DIR}")
+
+        print(
+            "\nNo PDF files found."
+        )
+
+        print(
+            f"Expected directory:\n"
+            f"{PDF_DIR}"
+        )
+
         return
 
-    print(f"\nFound {len(pdf_files)} PDF(s).")
+    print(
+        f"\nFound {len(pdf_files)} PDF(s)."
+    )
 
     results = []
+
+    # --------------------------------------------------------
+    # Process PDFs.
+    # --------------------------------------------------------
 
     for pdf_path in pdf_files:
 
         try:
-            result = process_document(pdf_path)
-            results.append(result)
+
+            result = process_document(
+                pdf_path
+            )
+
+            results.append(
+                result
+            )
 
         except Exception as exc:
+
             print(
                 f"\nERROR processing "
-                f"{pdf_path.name}: {exc}"
+                f"{pdf_path.name}: "
+                f"{exc}"
             )
 
     # --------------------------------------------------------
-    # Summary
+    # Summary.
     # --------------------------------------------------------
 
     print("\n")
     print("=" * 60)
-    print(" INGESTION SUMMARY")
+    print(
+        " INGESTION SUMMARY"
+    )
     print("=" * 60)
 
     for result in results:
+
         print(
             f"{result['document']}: "
             f"{result['pages']} pages | "
@@ -820,14 +1906,28 @@ def main():
             f"{result['sections']} sections"
         )
 
-    print("\nProcessed JSON directory:")
-    print(PROCESSED_DIR)
+    print(
+        "\nProcessed JSON directory:"
+    )
 
-    print("\nRaw text directory:")
-    print(RAW_DIR)
+    print(
+        PROCESSED_DIR
+    )
+
+    print(
+        "\nRaw text directory:"
+    )
+
+    print(
+        RAW_DIR
+    )
 
     print("\nDone.")
 
+
+# ============================================================
+# ENTRY POINT
+# ============================================================
 
 if __name__ == "__main__":
     main()
