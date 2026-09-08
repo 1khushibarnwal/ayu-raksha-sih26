@@ -14,3 +14,5 @@ psycopg[binary]
 python-multipart
 requests
 beautifulsoup4
+pytesseract
+pillow

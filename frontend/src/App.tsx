@@ -4,6 +4,7 @@ import {
   Route,
 } from 'react-router-dom'
 
+import ErrorBoundary from './components/ErrorBoundary'
 import Home from './pages/Home'
 import Login from './pages/Login'
 import Register from './pages/Register'
@@ -12,17 +13,35 @@ import Dashboard from './pages/Dashboard'
 import DashboardLayout from './components/DashboardLayout'
 
 import Assessment from './pages/Assessment'
+import InnovationAnalyzer from './pages/InnovationAnalyzer'
+import MyInnovations from './pages/MyInnovations'
+import ProfileSettings from './pages/ProfileSettings'
 
 function App() {
   return (
     <BrowserRouter>
-
-      <Routes>
+      <ErrorBoundary>
+        <Routes>
 
         {/* PUBLIC */}
         <Route
           path="/"
           element={<Home />}
+        />
+
+        <Route
+          path="/analyzer"
+          element={<InnovationAnalyzer />}
+        />
+
+        <Route
+          path="/innovations"
+          element={<MyInnovations />}
+        />
+
+        <Route
+          path="/settings"
+          element={<ProfileSettings />}
         />
 
         <Route
@@ -43,6 +62,16 @@ function App() {
           <Route
             index
             element={<Dashboard />}
+          />
+
+          <Route
+            path="analyzer"
+            element={<InnovationAnalyzer />}
+          />
+
+          <Route
+            path="innovations"
+            element={<MyInnovations />}
           />
 
           <Route
@@ -73,14 +102,13 @@ function App() {
 
           <Route
             path="settings"
-            element={
-              <h1>Settings</h1>
-            }
+            element={<ProfileSettings />}
           />
 
         </Route>
 
       </Routes>
+      </ErrorBoundary>
 
     </BrowserRouter>
   )

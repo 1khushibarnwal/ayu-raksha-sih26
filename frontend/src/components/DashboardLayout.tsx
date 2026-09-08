@@ -28,6 +28,17 @@ function DashboardLayout() {
             Dashboard
           </NavLink>
 
+          {/* INNOVATION ANALYZER */}
+          <NavLink
+            to="/analyzer"
+            className={({ isActive }) =>
+              `sidebar-link ${isActive ? 'sidebar-link-active' : ''}`
+            }
+          >
+            <span>⚗️</span>
+            Analyzer
+          </NavLink>
+
           {/* MY HEALTH */}
           <NavLink
             to="/dashboard/health"

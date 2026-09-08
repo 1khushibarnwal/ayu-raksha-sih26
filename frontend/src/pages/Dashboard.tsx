@@ -90,6 +90,12 @@ function Dashboard() {
         </div>
 
         <div className="quick-actions-grid">
+          <QuickAction
+            icon="⚗️"
+            title="Innovation Analyzer"
+            description="Assess formulation novelty & traditional knowledge risk."
+            to="/analyzer"
+          />
 
           <QuickAction
             icon="🩺"

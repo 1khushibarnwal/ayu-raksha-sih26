@@ -7,6 +7,11 @@ from app.api.routes import documents
 from app.api.routes import health
 
 
+from app.db.database import Base, engine
+import app.models  # noqa: F401
+
+Base.metadata.create_all(bind=engine)
+
 app = FastAPI(
     title="AyurakshaIP Backend",
     version="0.1.0",
